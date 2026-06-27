@@ -17,17 +17,18 @@ class ConfirmCancelScreen(ModalScreen[bool]):
     CSS = """
     ConfirmCancelScreen {
         align: center middle;
+        /* Paint the whole screen opaque so the native dbt log underneath can't
+           bleed through around the dialog (it was showing on every row before). */
+        background: $background;
     }
     #dialog {
         grid-size: 2 2;        /* 2 columns; row 1 is the question, row 2 the buttons */
-        grid-rows: 3 5;        /* question gets 3 cells; the button row gets 5 — 2 of
-                                  vertical slack so a 3-cell button never reaches the
-                                  border, even if the real driver's height math drifts */
+        grid-rows: 1fr 3;      /* question takes the slack; buttons get exactly 3 cells */
         grid-gutter: 1 2;
         padding: 1 2;
-        width: 64;
-        height: 16;            /* generously taller than the content needs, so the
-                                  buttons can't overflow the frame on any driver */
+        width: 60;
+        height: 11;            /* compact enough to fit a short terminal, with the bottom
+                                  border on-screen: border(2)+padding(2)+1fr+gutter(1)+buttons(3) */
         border: thick $error;
         background: $surface;
     }

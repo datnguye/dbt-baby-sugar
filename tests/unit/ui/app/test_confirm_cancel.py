@@ -8,7 +8,9 @@ from dbt_baby_sugar.ui.app.confirm_cancel import ConfirmCancelScreen
 
 class _Host(App[None]):
     def compose(self) -> ComposeResult:
-        yield Static("host")
+        # A busy log-like background, so a bleed-through around the modal is
+        # detectable in the rendered output.
+        yield Static("\n".join(f"START sql view model thing_{i}" for i in range(40)))
 
 
 async def _open_and_choose(button_id: str | None, key: str | None = None) -> bool | None:
@@ -53,3 +55,18 @@ async def test_buttons_render_inside_the_dialog_border() -> None:
             # a driver whose height math drifts a cell or two still can't clip them.
             assert button.bottom + 1 < dialog.bottom, f"#{button_id} too close to the bottom border"
             assert dialog.x < button.x and button.right < dialog.right
+
+
+async def test_modal_paints_over_the_log_background() -> None:
+    # Guards the bleed-through bug where the native dbt log showed around the
+    # dialog. The row above the dialog must be the screen's opaque background, not
+    # leftover log text bleeding through.
+    app = _Host()
+    async with app.run_test(size=(100, 24)) as pilot:
+        app.push_screen(ConfirmCancelScreen())
+        await pilot.pause()
+        await pilot.pause()
+        strip = next(iter(app.screen._compositor.render_strips()))
+        assert strip.text.strip() == "", "log text bled through above the dialog"
+        backgrounds = {seg.style.bgcolor for seg in strip if seg.style and seg.style.bgcolor}
+        assert backgrounds, "the screen above the dialog was not painted opaque"

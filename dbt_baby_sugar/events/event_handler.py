@@ -101,13 +101,13 @@ class SugarEventHandler:
         )
 
     def _on_skip(self, data: Any) -> None:
-        info = getattr(data, "node_info", None)
+        info = _node_info_of(data)
         if info is None:
             return
         self.run_state.skip(info.unique_id, info.node_name)
 
     def _on_message(self, data: Any) -> None:
-        info = getattr(data, "node_info", None)
+        info = _node_info_of(data)
         message = _message_of(data)
         if info is None or not message:
             return
@@ -115,7 +115,11 @@ class SugarEventHandler:
 
     def _on_summary(self, data: Any) -> None:
         self.run_state.summary.threads = _typed(data, "num_threads", int)
-        self.run_state.summary.target = getattr(data, "target_name", None) or None
+        self.run_state.summary.target = _typed(data, "target_name", str)
+
+
+def _node_info_of(data: Any) -> Any | None:
+    return getattr(data, "node_info", None)
 
 
 def _status_of(data: Any, info: Any) -> str:

@@ -46,7 +46,7 @@ class OverviewFormatter:
             self._bar(run_state),
             self._tally(run_state),
         ]
-        if self._is_done(run_state):
+        if run_state.is_done:
             lines.append(self._outcome(run_state))
             return self._with_mascot(Group(*lines), run_state)
         rows = self._section_size(run_state)
@@ -64,7 +64,7 @@ class OverviewFormatter:
         """A single verdict line that replaces the running/up-next sections once
         finished, so the now-compact panel still says how the run went."""
         s = run_state.summary
-        if self._has_failures(run_state):
+        if s.errored or s.skipped:
             label = f"❌ finished with {s.errored} error(s)"
             if s.skipped:
                 label += f", {s.skipped} skipped"
@@ -84,16 +84,9 @@ class OverviewFormatter:
         grid.add_row(content, self._mascot.frame(mood))
         return grid
 
-    def _has_failures(self, run_state: RunState) -> bool:
-        s = run_state.summary
-        return bool(s.errored or s.skipped)
-
     def _section_size(self, run_state: RunState) -> int:
         threads = run_state.summary.threads
         return threads if threads else self.up_next
-
-    def _is_done(self, run_state: RunState) -> bool:
-        return run_state.is_done
 
     def _bar(self, run_state: RunState) -> Text:
         total = run_state.run_total
