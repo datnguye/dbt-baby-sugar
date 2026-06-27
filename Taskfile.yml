@@ -1,0 +1,37 @@
+version: "3"
+
+silent: true
+
+tasks:
+  default:
+    desc: List available tasks.
+    cmds:
+      - task --list
+
+  install:
+    desc: Sync the uv environment (incl. dev group).
+    cmds:
+      - uv sync --group dev
+
+  format:
+    desc: Apply Ruff formatting and autofixes.
+    cmds:
+      - uv run ruff format .
+      - uv run ruff check --fix .
+
+  lint:
+    desc: Ruff format-check and lint (no writes).
+    cmds:
+      - uv run ruff format --check .
+      - uv run ruff check .
+
+  test:
+    desc: Pytest with the 100% coverage gate.
+    cmds:
+      - uv run pytest --cov=dbt_baby_sugar --cov-report=term-missing --cov-fail-under=100
+
+  git-hooks:
+    desc: Install pre-commit and commit-msg git hooks.
+    cmds:
+      - uv run pre-commit install --install-hooks
+      - uv run pre-commit install --hook-type commit-msg

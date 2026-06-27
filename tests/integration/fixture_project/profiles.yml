@@ -1,0 +1,7 @@
+sugar_fixture:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('SUGAR_DUCKDB_PATH', 'sugar_fixture.duckdb') }}"
+      threads: 4

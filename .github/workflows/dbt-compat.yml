@@ -1,0 +1,93 @@
+name: dbt compat (latest)
+
+on:
+  schedule:
+    # 06:00 UTC on the 1st of every month
+    - cron: "0 6 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  compat:
+    runs-on: ubuntu-latest
+    outputs:
+      dbt-version: ${{ steps.resolve.outputs.dbt-version }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.2.0
+
+      - name: Install dependencies
+        run: uv sync --group dev --group integration
+
+      - name: Upgrade to the latest dbt-core
+        id: resolve
+        run: |
+          uv pip install --upgrade "dbt-core" "dbt-duckdb"
+          version="$(uv run python -c 'import dbt.version; print(dbt.version.__version__)')"
+          echo "Testing against dbt-core $version"
+          echo "dbt-version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Drive a real dbt run against latest dbt-core
+        run: uv run pytest tests/integration -v
+
+  report-failure:
+    needs: compat
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update a compat-failure issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ needs.compat.outputs.dbt-version }}' || 'unknown';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const label = 'dbt-compat';
+            const title = `dbt-baby-sugar incompatible with latest dbt-core (${version})`;
+            const body = [
+              `The monthly compatibility check failed against **dbt-core \`${version}\`**.`,
+              ``,
+              `- Workflow run: ${runUrl}`,
+              `- Triggered by: \`${context.eventName}\``,
+              ``,
+              `dbt likely changed its event-bus API or event payloads. Check`,
+              `\`dbt_baby_sugar/events/event_handler.py\` and \`activation/activation.py\` against the new release.`,
+            ].join('\n');
+
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: label,
+            });
+
+            if (existing.data.length > 0) {
+              const issue = existing.data[0];
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: `Still failing on **dbt-core \`${version}\`** — ${runUrl}`,
+              });
+              core.notice(`Commented on existing issue #${issue.number}`);
+            } else {
+              const created = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: [label],
+              });
+              core.notice(`Opened issue #${created.data.number}`);
+            }

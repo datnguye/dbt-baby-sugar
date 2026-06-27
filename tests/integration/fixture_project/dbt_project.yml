@@ -1,0 +1,12 @@
+name: sugar_fixture
+version: "1.0.0"
+profile: sugar_fixture
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  sugar_fixture:
+    +materialized: table

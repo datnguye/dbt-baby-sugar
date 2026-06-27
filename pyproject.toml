@@ -1,0 +1,86 @@
+[project]
+name = "dbt-baby-sugar"
+dynamic = ["version"]
+description = "A plugin for dbt that changes the default look and feel: a live progress bar and per-node status tree"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "Dat Nguyen", email = "datnguyen.it09@gmail.com" }]
+keywords = ["dbt", "cli", "progress", "rich", "tui"]
+classifiers = [
+  "Environment :: Console",
+  "Operating System :: OS Independent",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+  "dbt-core>=1.8",
+  "rich>=13",
+  "textual>=0.60",
+]
+
+[project.urls]
+Homepage = "https://github.com/datnguye/dbt-baby-sugar"
+Repository = "https://github.com/datnguye/dbt-baby-sugar"
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.targets.wheel]
+packages = ["dbt_baby_sugar"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "dbt_baby_sugar",
+  "README.md",
+  "LICENSE",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+  "pytest-cov>=5.0",
+  "ruff>=0.4",
+]
+# The compat suite drives a REAL dbt run on a DuckDB fixture, so it needs an
+# adapter. Kept out of `dev` so the unit gate stays lean and warehouse-free.
+integration = [
+  "dbt-duckdb>=1.8",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "PLC0415"]
+
+[tool.pytest.ini_options]
+# The unit gate runs `tests/unit` (synthetic events, 100% coverage). The real-dbt
+# compat suite lives in `tests/integration` and is run explicitly by the compat
+# workflow — it needs an adapter and a live dbt invocation, so it stays out of the
+# default run and the coverage gate.
+testpaths = ["tests/unit"]
+addopts = "-ra --strict-markers --strict-config"
+asyncio_mode = "auto"
+markers = [
+  "integration: drives a real dbt run; needs the `integration` dependency group",
+]
+
+[tool.coverage.run]
+source = ["dbt_baby_sugar"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
+exclude_also = [
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+  "\\.\\.\\.",
+  "pragma: no cover",
+]

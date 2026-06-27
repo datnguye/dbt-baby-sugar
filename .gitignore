@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# dbt integration fixture artifacts
+*.duckdb
+logs/
+.user.yml
