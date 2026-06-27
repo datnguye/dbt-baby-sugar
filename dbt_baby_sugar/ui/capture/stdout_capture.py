@@ -60,5 +60,5 @@ def _retarget_stream_handlers(old: TextIO, new: StdoutCapture) -> None:
 def _all_loggers() -> list[logging.Logger]:
     manager_dict = logging.Logger.manager.loggerDict.values()
     loggers = [logging.getLogger()]
-    loggers += [lg for lg in manager_dict if isinstance(lg, logging.Logger)]
+    loggers.extend(lg for lg in manager_dict if isinstance(lg, logging.Logger))
     return loggers

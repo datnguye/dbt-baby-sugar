@@ -131,6 +131,20 @@ def test_upcoming_ranks_running_blockers_ahead_of_queued_chains() -> None:
     assert ordered == ["near", "far_root", "far"]
 
 
+def test_upcoming_puts_running_downstream_ahead_of_a_free_root() -> None:
+    # The screenshot case: a node waiting on a RUNNING model is the true "up next"
+    # and must lead a free root that merely happens to have no blockers.
+    state = RunState(
+        [
+            ModelRun("m.busy", "busy"),
+            ModelRun("m.downstream", "downstream", frozenset({"m.busy"})),
+            ModelRun("m.free_root", "free_root"),
+        ]
+    )
+    state.start("m.busy")
+    assert [m.name for m in state.upcoming(limit=5)] == ["downstream", "free_root"]
+
+
 def test_upcoming_is_empty_once_run_is_complete() -> None:
     # The manifest seeds the whole DAG, but `dbt run` skips the two seeds. They
     # sit QUEUED forever; once dbt has run its 2 models, "up next" must be empty

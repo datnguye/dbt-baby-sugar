@@ -144,8 +144,7 @@ def _elapsed_of(data: Any) -> float | None:
     direct = _typed(data, "execution_time", float)
     if direct is not None:
         return direct
-    run_result = _run_result_of(data)
-    return _typed(run_result, "execution_time", float) if run_result else None
+    return _typed(_run_result_of(data), "execution_time", float)
 
 
 def _run_result_of(data: Any) -> Any | None:

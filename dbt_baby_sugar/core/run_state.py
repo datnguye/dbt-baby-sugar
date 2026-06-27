@@ -101,22 +101,23 @@ class RunState:
     def _imminence(self, model: ModelRun) -> tuple[int, int, int]:
         """Sort key for "up next": nodes about to unblock come first.
 
-        The closest queued node is one waiting directly behind the running front —
-        every remaining blocker is already *running*, so it unblocks the instant
-        they finish. Rank:
+        The closest queued node is one waiting *directly behind the running front*:
+        it has a blocker that is running right now, so it unblocks the instant that
+        upstream finishes. Those lead everything. Rank (all ascending):
 
-        1. nodes with no blocker still merely queued (all blockers running) first,
-        2. among those, prefer the ones that actually have a running blocker to
-           wait on over free roots that have nothing running ahead of them,
+        1. nodes with a currently-running blocker first — the true downstream of
+           the running front, what is genuinely "up next",
+        2. then by fewest blockers still merely queued, so a free root (nothing
+           ahead of it) outranks a node buried behind a queued chain,
         3. then fewest total blockers.
 
-        So mid-run the models waiting on a running upstream lead; roots only lead
-        at the very start, before anything is running for them to follow.
+        So mid-run the models waiting on a running upstream lead; free roots and
+        deeper queued chains follow behind them.
         """
         blockers = self._blocking_models(model)
         still_queued = sum(1 for m in blockers if m.phase is RunPhase.QUEUED)
         has_running_blocker = any(m.phase is RunPhase.RUNNING for m in blockers)
-        return still_queued, 0 if has_running_blocker else 1, len(blockers)
+        return 0 if has_running_blocker else 1, still_queued, len(blockers)
 
     def waiting_on(self, unique_id: str) -> list[str]:
         with self._lock:
