@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib
 import sys
+from typing import Any
 
 from dbt_baby_sugar.core.manifest import ManifestReader
 from dbt_baby_sugar.core.run_state import RunState
@@ -40,10 +41,22 @@ def _build_handler() -> SugarEventHandler:
     return SugarEventHandler(run_state, driver, manifest_reader=lazy_reader)
 
 
-def _install_via_callback(handler: SugarEventHandler) -> bool:
+def _optional_import(name: str) -> Any | None:
+    """Import a dbt-internal module, or None if it isn't importable here.
+
+    The two install paths each reach into a different ``dbt_common`` module that
+    may be absent depending on the dbt version, so both guard the import the same
+    way; this folds that shared try/except into one place.
+    """
     try:
-        functions = importlib.import_module("dbt_common.events.functions")
+        return importlib.import_module(name)
     except ImportError:
+        return None
+
+
+def _install_via_callback(handler: SugarEventHandler) -> bool:
+    functions = _optional_import("dbt_common.events.functions")
+    if functions is None:
         return False
     functions.get_event_manager().add_callback(handler)
     return True
@@ -58,9 +71,8 @@ def _make_patched(original, handler):
 
 
 def _install_via_patch(handler: SugarEventHandler) -> bool:
-    try:
-        event_manager = importlib.import_module("dbt_common.events.event_manager")
-    except ImportError:
+    event_manager = _optional_import("dbt_common.events.event_manager")
+    if event_manager is None:
         return False
     manager_cls = event_manager.EventManager
     manager_cls.fire_event = _make_patched(manager_cls.fire_event, handler)

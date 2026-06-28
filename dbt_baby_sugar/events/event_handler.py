@@ -27,6 +27,8 @@ SKIP_EVENTS = ("SkippingDetails", "LogSkipBecauseError")
 MESSAGE_EVENTS = ("RunResultError", "RunResultWarningMessage", "JinjaLogWarning", "LogStartLine")
 SUMMARY_EVENTS = ("ConcurrencyLine",)
 
+MESSAGE_ATTRS = ("msg", "result_message", "description")
+
 
 class Renderer(Protocol):
     def update(self, run_state: RunState) -> None: ...
@@ -123,17 +125,15 @@ def _node_info_of(data: Any) -> Any | None:
 
 
 def _status_of(data: Any, info: Any) -> str:
-    status = getattr(data, "status", None)
-    if status:
-        return str(status)
-    run_result = _run_result_of(data)
-    if run_result is not None and getattr(run_result, "status", None):
-        return str(run_result.status)
-    return info.node_status
+    return (
+        _typed(data, "status", str)
+        or _typed(_run_result_of(data), "status", str)
+        or info.node_status
+    )
 
 
 def _message_of(data: Any) -> str | None:
-    for attr in ("msg", "result_message", "description"):
+    for attr in MESSAGE_ATTRS:
         value = getattr(data, attr, None)
         if value:
             return str(value)

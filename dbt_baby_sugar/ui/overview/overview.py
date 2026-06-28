@@ -11,6 +11,8 @@ The animated face mascot in the top-right lives in its own module — see
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from rich.console import Group, RenderableType
 from rich.table import Table
 from rich.text import Text
@@ -31,6 +33,10 @@ RUNNING_GLYPH = "▶"
 QUEUED_GLYPH = "•"
 RUNNING_STYLE = "bold green"
 QUEUED_STYLE = "yellow"
+RUNNING_NAME_STYLE = "bold white"
+QUEUED_NAME_STYLE = "grey78"
+RUNNING_DETAIL_STYLE = "grey62"
+QUEUED_DETAIL_STYLE = "grey50"
 RUNNING_HEADER_STYLE = "bold green"
 UP_NEXT_HEADER_STYLE = "bold yellow"
 NAME_WIDTH = 28
@@ -51,14 +57,31 @@ class OverviewFormatter:
             return self._with_mascot(Group(*lines), run_state)
         rows = self._section_size(run_state)
         running = run_state.running()[:rows]
-        if running:
-            lines.append(Text("running", style=RUNNING_HEADER_STYLE))
-            lines += [self._running_row(m) for m in running]
+        self._add_section(lines, "running", RUNNING_HEADER_STYLE, running, self._running_row)
         upcoming = run_state.upcoming(rows)
-        if upcoming:
-            lines.append(Text("up next", style=UP_NEXT_HEADER_STYLE))
-            lines += [self._upcoming_row(run_state, m) for m in upcoming]
+        self._add_section(
+            lines,
+            "up next",
+            UP_NEXT_HEADER_STYLE,
+            upcoming,
+            lambda m: self._upcoming_row(run_state, m),
+        )
         return self._with_mascot(Group(*lines), run_state)
+
+    def _add_section(
+        self,
+        lines: list[Text],
+        header: str,
+        header_style: str,
+        models: list[ModelRun],
+        row: Callable[[ModelRun], Text],
+    ) -> None:
+        """Append a titled section — a styled header then one row per model — but
+        only when there is at least one model, so empty sections leave no header."""
+        if not models:
+            return
+        lines.append(Text(header, style=header_style))
+        lines += [row(m) for m in models]
 
     def _outcome(self, run_state: RunState) -> Text:
         """A single verdict line that replaces the running/up-next sections once
@@ -113,20 +136,43 @@ class OverviewFormatter:
         line.append(f"SKIP={s.skipped}", style="grey50")
         return line
 
-    def _running_row(self, model: ModelRun) -> Text:
-        detail = f"{model.elapsed:.1f}s" if model.elapsed is not None else "in progress"
+    def _row(
+        self,
+        glyph: str,
+        glyph_style: str,
+        name: str,
+        name_style: str,
+        detail: str,
+        detail_style: str,
+    ) -> Text:
+        """A glyph + padded name + trailing detail line, the shared shape of both
+        the running and up-next rows."""
         line = Text()
-        line.append(f"  {RUNNING_GLYPH} ", style=RUNNING_STYLE)
-        line.append(f"{_truncate(model.name):<{NAME_WIDTH}}", style="bold white")
-        line.append(detail, style="grey62")
+        line.append(f"  {glyph} ", style=glyph_style)
+        line.append(f"{_truncate(name):<{NAME_WIDTH}}", style=name_style)
+        line.append(detail, style=detail_style)
         return line
 
+    def _running_row(self, model: ModelRun) -> Text:
+        detail = f"{model.elapsed:.1f}s" if model.elapsed is not None else "in progress"
+        return self._row(
+            RUNNING_GLYPH,
+            RUNNING_STYLE,
+            model.name,
+            RUNNING_NAME_STYLE,
+            detail,
+            RUNNING_DETAIL_STYLE,
+        )
+
     def _upcoming_row(self, run_state: RunState, model: ModelRun) -> Text:
-        line = Text()
-        line.append(f"  {QUEUED_GLYPH} ", style=QUEUED_STYLE)
-        line.append(f"{_truncate(model.name):<{NAME_WIDTH}}", style="grey78")
-        line.append(self._detail(run_state, model), style="grey50")
-        return line
+        return self._row(
+            QUEUED_GLYPH,
+            QUEUED_STYLE,
+            model.name,
+            QUEUED_NAME_STYLE,
+            self._detail(run_state, model),
+            QUEUED_DETAIL_STYLE,
+        )
 
     def _detail(self, run_state: RunState, model: ModelRun) -> str:
         blockers = run_state.waiting_on(model.unique_id)

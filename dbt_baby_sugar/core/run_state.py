@@ -72,9 +72,12 @@ class RunState:
             model.phase = RunPhase.SKIPPED if node_status is NodeStatus.SKIPPED else RunPhase.DONE
             model.status = node_status
             model.elapsed = elapsed
-            for attr, value in (("index", index), ("total", total), ("message", message)):
-                if value is not None:
-                    setattr(model, attr, value)
+            if index is not None:
+                model.index = index
+            if total is not None:
+                model.total = total
+            if message is not None:
+                model.message = message
             self.summary.record(node_status)
 
     def skip(self, unique_id: str, name: str | None = None) -> None:
@@ -98,7 +101,7 @@ class RunState:
     def _blockers(self, model: ModelRun) -> list[str]:
         return sorted(m.name for m in self._blocking_models(model))
 
-    def _imminence(self, model: ModelRun) -> tuple[int, int, int]:
+    def _imminence(self, blockers: list[ModelRun]) -> tuple[int, int, int]:
         """Sort key for "up next": nodes about to unblock come first.
 
         The closest queued node is one waiting *directly behind the running front*:
@@ -113,8 +116,11 @@ class RunState:
 
         So mid-run the models waiting on a running upstream lead; free roots and
         deeper queued chains follow behind them.
+
+        Takes the model's already-computed blockers so ``upcoming`` resolves each
+        node's upstreams once rather than re-walking ``depends_on`` inside the sort
+        comparator (which would be an O(n²) sweep over the pending set).
         """
-        blockers = self._blocking_models(model)
         still_queued = sum(1 for m in blockers if m.phase is RunPhase.QUEUED)
         has_running_blocker = any(m.phase is RunPhase.RUNNING for m in blockers)
         return 0 if has_running_blocker else 1, still_queued, len(blockers)
@@ -150,7 +156,8 @@ class RunState:
             if self._is_complete():
                 return []
             pending = [m for m in self._models.values() if m.phase is RunPhase.QUEUED]
-            pending.sort(key=lambda m: (*self._imminence(m), m.name))
+            blockers = {m.unique_id: self._blocking_models(m) for m in pending}
+            pending.sort(key=lambda m: (*self._imminence(blockers[m.unique_id]), m.name))
             return pending[:limit]
 
     def _reported_max(self) -> int | None:
@@ -162,6 +169,9 @@ class RunState:
 
     def _done_count(self) -> int:
         return sum(1 for m in self._models.values() if m.seen and m.finished)
+
+    def _phase_count(self, phase: RunPhase) -> int:
+        return sum(1 for m in self._models.values() if m.phase is phase)
 
     def _is_complete(self) -> bool:
         run_total = self._reported_max()
@@ -203,7 +213,7 @@ class RunState:
     @property
     def queued(self) -> int:
         with self._lock:
-            return sum(1 for m in self._models.values() if m.phase is RunPhase.QUEUED)
+            return self._phase_count(RunPhase.QUEUED)
 
     def __iter__(self) -> Iterator[ModelRun]:
         with self._lock:
